@@ -12,10 +12,10 @@ This originally started as a simple college project, but now my team and I want 
 ## Development Roadmap <br>
 
 The current roadmap is as follows: <br>
--[ ] Shifting 0.1 version to LLVM-IR <br>
--[ ] Support for functions, loops and datatypes <br>
--[ ] Support for classes <br>
--[ ] Support for non-primitive datatypes like arrays & vector <br>
--[ ] Support for structures like pattern-matching, input & output
+- [ ] Shifting 0.1 version to LLVM-IR <br>
+- [ ] Support for functions, loops and datatypes <br>
+- [ ] Support for classes <br>
+- [ ] Support for non-primitive datatypes like arrays & vector <br>
+- [ ] Support for structures like pattern-matching, input & output
 
 The Roadmap will keep getting updated as we move on in the development. We don't to overwhelm ourselves to too big of a goal right now.
