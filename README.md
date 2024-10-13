@@ -1,21 +1,48 @@
-# Amayori Compiler
-This repository contains the version starting from 1.0.0 of the Amayori compiler. The Version 0.1 is in my private repo is, very primitive.
+# 🌐 Amayori Compiler
 
-This originally started as a simple college project, but now my team and I want to take this to the next level. Our goal is very simple.
-<br>
-<br>
-> A compiler which can serve as a middle-point for all other languages. A language where one can co-ordinate between codes return in, let's say Python, Java and C++, and still make it work.
-<br>
+**Welcome to Amayori!**  
+This repository contains the development from version **v0.2.0** onward of the Amayori compiler. Earlier versions, including the initial **v0.1**, were kept private, serving as the foundational experiment for what's now evolving into something much more ambitious.
 
-<br>
+### 🎯 **What is Amayori?**  
+Amayori began as a simple college project but has grown into a collaborative effort with a bigger goal:
 
-## Development Roadmap <br>
+> **Amayori aims to be a universal compiler, enabling seamless coordination between multiple languages** — whether it's Python, Java, or C++. Imagine writing code in multiple languages and having one compiler to bridge them all effortlessly.
 
-The current roadmap is as follows: <br>
-- [ ] Shifting 0.1 version to LLVM-IR <br>
-- [ ] Support for functions, loops and datatypes <br>
-- [ ] Support for classes <br>
-- [ ] Support for non-primitive datatypes like arrays & vector <br>
-- [ ] Support for structures like pattern-matching, input & output
+With this, we’re working toward making language interoperability smoother and more efficient than ever before. If you're passionate about compilers or language design, you’re in the right place!
 
-The Roadmap will keep getting updated as we move on in the development. We don't to overwhelm ourselves to too big of a goal right now.
+---
+
+### 🚀 **Development Roadmap**
+
+We're focusing on iterative, achievable milestones to ensure steady growth while maintaining high-quality standards. Here’s what we’re tackling next:
+
+- [ ] **Upgrade to LLVM-IR**: Moving from the primitive v0.1 version to LLVM-IR, laying a solid foundation for modern compiler development.
+- [ ] **Core Language Features**: Adding support for essential programming constructs like functions, loops, and fundamental data types.
+- [ ] **Object-Oriented Support**: Introducing class structures for better modularity and real-world applications.
+- [ ] **Advanced Data Structures**: Expanding support for non-primitive types such as arrays and vectors.
+- [ ] **Pattern Matching & I/O**: Implementing advanced control flow mechanisms like pattern matching, and enhancing input/output capabilities.
+
+This roadmap will be updated regularly to reflect new goals and community-driven priorities.
+
+---
+
+### 🤝 **How Can You Contribute?**
+
+We’re excited to have a growing community of contributors and collaborators! Here’s how you can get involved:
+
+1. **Check out our issues**: There are always new features and bugs to tackle.
+2. **Join the discussion**: Got an idea or suggestion? Head over to our [Discord server](#).
+3. **Submit a pull request**: Help improve Amayori by fixing bugs, adding features, or optimizing performance.
+
+Every contribution, big or small, moves us closer to making Amayori a compiler that bridges languages in a groundbreaking way!
+
+---
+
+### 💬 **Connect with Us**
+
+- **Discord**: Join the community to discuss, ask questions, or collaborate!
+- **Twitter**: Follow us for the latest updates and announcements.
+
+---
+
+Together, we can build something remarkable. Let's redefine what a compiler can do!  
