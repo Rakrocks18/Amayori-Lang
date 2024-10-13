@@ -31,7 +31,7 @@ This roadmap will be updated regularly to reflect new goals and community-driven
 We’re excited to have a growing community of contributors and collaborators! Here’s how you can get involved:
 
 1. **Check out our issues**: There are always new features and bugs to tackle.
-2. **Join the discussion**: Got an idea or suggestion? Head over to our [Discord server](#).
+2. **Join the discussion**: Got an idea or suggestion? Head over to our [Discord server](https://discord.gg/VqtUMbJdta).
 3. **Submit a pull request**: Help improve Amayori by fixing bugs, adding features, or optimizing performance.
 
 Every contribution, big or small, moves us closer to making Amayori a compiler that bridges languages in a groundbreaking way!
