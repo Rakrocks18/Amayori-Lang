@@ -40,7 +40,7 @@ namespace node {
         ExprAST* getRHS() const { return RHS.get(); }
     };
 
-    class FuncCallExprAST : public ExprAST {
+    class FuncCallExprAST : public ExprAST {  //call(int a, int b)
         std::string Callee;
         std::vector<std::unique_ptr<ExprAST>> Args;
 

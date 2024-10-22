@@ -1,6 +1,7 @@
 //
 // Created by vivek on 10-10-2024.
 //
+#pragma once
 #include <string>
 #include <vector>
 #include <cctype>
@@ -25,7 +26,7 @@ struct Token {
     std::string lexeme;
     int line;
 
-    Token(TokenType type, std::string lexeme, int line)
+    Token(TokenType type, std::string lexeme, int line)  //10 -> Integer, "10", 1     //a -> Identifier, "a", 1
         : type(type), lexeme(std::move(lexeme)), line(line) {}
 };
 

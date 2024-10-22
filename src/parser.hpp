@@ -1,9 +1,11 @@
 //
 // Created by vivek on 10-10-2024.
 //
+#pragma once
 #include <memory>
 #include <stdexcept>
 #include "AmayoriAST.hpp"
+#include "tokenizer.hpp"
 
 
 class Parser {
@@ -28,13 +30,13 @@ private:
         return previous();
     }
 
-    bool check(TokenType type) const {
+    bool check_type(TokenType type) const {
         if (isAtEnd()) return false;
         return peek().type == type;
     }
 
     bool match(TokenType type) {
-        if (check(type)) {
+        if (check_type(type)) {
             advance();
             return true;
         }
@@ -47,7 +49,7 @@ private:
         }
 
         if (match(TokenType::LeftParen)) {
-            auto expr = expression();
+            auto expr = expression();  //7 + 8 * 9
             if (!match(TokenType::RightParen)) {
                 throw std::runtime_error("Expect ')' after expression.");
             }
@@ -57,12 +59,12 @@ private:
         throw std::runtime_error("Expect expression.");
     }
 
-    std::unique_ptr<node::ExprAST> term() {
-        auto expr = primary();
+    std::unique_ptr<node::ExprAST> term() { // *7 x 9
+        auto expr = primary(); //7 *x 9
 
-        while (match(TokenType::Star) || match(TokenType::Slash)) {
-            Token op = previous();
-            auto right = primary();
+        while (match(TokenType::Star) || match(TokenType::Slash)) { //7 x *9
+            Token op = previous(); //op =  token(7), 7 x *9
+            auto right = primary(); // 7 x 9
             expr = std::make_unique<node::BinaryExprAST>(op.lexeme[0], std::move(expr), std::move(right));
         }
 
@@ -70,7 +72,7 @@ private:
     }
 
     std::unique_ptr<node::ExprAST> expression() {
-        auto expr = term();
+        auto expr = term(); //tok
 
         while (match(TokenType::Plus) || match(TokenType::Minus)) {
             Token op = previous();

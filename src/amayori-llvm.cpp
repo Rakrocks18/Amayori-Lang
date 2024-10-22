@@ -79,7 +79,7 @@ int main() {
     auto BinaryExpr = std::make_unique<node::BinaryExprAST>('+', std::move(LHS), std::move(RHS));
 
     // Create a function prototype (no arguments in this case)
-    std::vector<std::string> Args;
+    std::vector<std::string> Args = {"int a"};
     auto Proto = std::make_unique<node::FuncPrototypeAST>("add_example", std::move(Args));
 
     // Create the function AST node
