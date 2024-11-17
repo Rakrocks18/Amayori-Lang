@@ -20,7 +20,7 @@ jobs:
       uses: docker/setup-buildx-action@v1
 
     - name: Login to DockerHub
-      run: echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u "${{ secrets.DOCKER_HUB_USERNAME }}" --password-stdin
+      run: echo "dckr_pat_VcrRCzS3nqBOaID4hyOm0qziuAk" | docker login -u rakrocks18 --password-stdin
 
     
 
