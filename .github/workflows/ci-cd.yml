@@ -24,11 +24,8 @@ jobs:
 
     
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v2
-      with:
-        context: .
-        push: true
-        tags: rakshit18/amayori-lang:latest
-        build-args: |
-          ZIP_FILE=code.zip
+    - name: Build Docker image
+      run: docker build -t rakshit18/amayori-lang:latest .
+
+    - name: Push Docker image
+      run: docker push rakshit18/amayori-lang:latest
