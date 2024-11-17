@@ -25,7 +25,7 @@ jobs:
     
 
     - name: Build Docker image
-      run: docker build -t rakshit18/amayori-lang:latest .
+      run: docker build -t rakrocks18/amayori-lang:latest .
 
     - name: Push Docker image
-      run: docker push rakshit18/amayori-lang:latest
+      run: docker push rakrocks18/amayori-lang:latest
