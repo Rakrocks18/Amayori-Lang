@@ -30,6 +30,6 @@ jobs:
       with:
         context: .
         push: true
-        tags: yourusername/yourrepository:latest
+        tags: rakshit18/amayori-lang:latest
         build-args: |
           ZIP_FILE=code.zip
