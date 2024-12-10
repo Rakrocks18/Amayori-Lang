@@ -1,12 +1,11 @@
-//
-// Created by vivek on 10-10-2024.
-//
 #pragma once
 #include <memory>
+#include <string>
+#include <vector>
 #include <stdexcept>
+
 #include "AmayoriAST.hpp"
 #include "tokenizer.hpp"
-
 
 class Parser {
 private:
@@ -47,9 +46,13 @@ private:
         if (match(TokenType::Integer)) {
             return std::make_unique<node::IntExprAST>(std::stoi(previous().lexeme));
         }
+        
+        if (match(TokenType::Identifier)) {
+            return std::make_unique<node::VariableExprAST>(previous().lexeme);
+        }
 
         if (match(TokenType::LeftParen)) {
-            auto expr = expression();  //7 + 8 * 9
+            auto expr = expression();
             if (!match(TokenType::RightParen)) {
                 throw std::runtime_error("Expect ')' after expression.");
             }
@@ -59,27 +62,37 @@ private:
         throw std::runtime_error("Expect expression.");
     }
 
-    std::unique_ptr<node::ExprAST> term() { // *7 x 9
-        auto expr = primary(); //7 *x 9
-
-        while (match(TokenType::Star) || match(TokenType::Slash)) { //7 x *9
-            Token op = previous(); //op =  token(7), 7 x *9
-            auto right = primary(); // 7 x 9
-            expr = std::make_unique<node::BinaryExprAST>(op.lexeme[0], std::move(expr), std::move(right));
+    std::unique_ptr<node::ExprAST> term() {
+        auto expr = primary();
+        
+        while (match(TokenType::Star) || match(TokenType::Slash)) {
+            Token op = previous();
+            auto right = primary();
+            
+            expr = std::make_unique<node::BinaryExprAST>(
+                op.lexeme[0], 
+                std::move(expr), 
+                std::move(right)
+            );
         }
-
+        
         return expr;
     }
 
     std::unique_ptr<node::ExprAST> expression() {
-        auto expr = term(); //tok
-
+        auto expr = term();
+        
         while (match(TokenType::Plus) || match(TokenType::Minus)) {
             Token op = previous();
             auto right = term();
-            expr = std::make_unique<node::BinaryExprAST>(op.lexeme[0], std::move(expr), std::move(right));
+            
+            expr = std::make_unique<node::BinaryExprAST>(
+                op.lexeme[0], 
+                std::move(expr), 
+                std::move(right)
+            );
         }
-
+        
         return expr;
     }
 
