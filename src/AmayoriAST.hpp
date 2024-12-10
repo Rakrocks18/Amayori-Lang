@@ -5,71 +5,160 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <stdexcept>
+#include <optional>
 
 namespace node {
+    // Forward declarations
+    class ASTVisitor;
+
+    // Base Expression AST with Visitor support
     class ExprAST {
     public:
         virtual ~ExprAST() = default;
+        
+        // Visitor pattern support
+        virtual void accept(ASTVisitor* visitor) = 0;
+        
+        // Error handling
+        virtual bool hasError() const { return false; }
+        virtual std::string getErrorMessage() const { return ""; }
     };
 
+    // Integer Expression
     class IntExprAST : public ExprAST {
+    private:
         int val;
         
     public:
-        IntExprAST(int val) : val(val) {}
-        int getVal() const { return val; }
+        explicit IntExprAST(int val) : val(val) {}
+        
+        int getValue() const { return val; }
+        
+        void accept(ASTVisitor* visitor) override;
     };
 
+    // Variable Expression 
     class VariableExprAST : public ExprAST {
-        std::string Name;
-
+    private:
+        std::string name;
+    
     public:
-        VariableExprAST(std::string Name) : Name(Name) {}
-        const std::string& getName() const { return Name; }
+        explicit VariableExprAST(std::string name) : name(std::move(name)) {}
+        
+        const std::string& getName() const { return name; }
+        
+        void accept(ASTVisitor* visitor) override;
     };
 
-    class BinaryExprAST : public ExprAST {
-        char Op;
-        std::unique_ptr<ExprAST> LHS, RHS;
-
+    // Binary Operation Expression
+    class BinaryExprAST : public ExprAST {  //Previously it was returning raw pointers, which could lead to ownership confusion, therefore added a unique pointer for managing memory
+    private:
+        char op;
+        std::unique_ptr<ExprAST> lhs;
+        std::unique_ptr<ExprAST> rhs;
+    
     public:
-        BinaryExprAST(char Op, std::unique_ptr<ExprAST> LHS, std::unique_ptr<ExprAST> RHS) 
-            : Op(Op), LHS(std::move(LHS)), RHS(std::move(RHS)) {}
-        char getOp() const { return Op; }
-        ExprAST* getLHS() const { return LHS.get(); }
-        ExprAST* getRHS() const { return RHS.get(); }
+        BinaryExprAST(
+            char op, 
+            std::unique_ptr<ExprAST> lhs, 
+            std::unique_ptr<ExprAST> rhs
+        ) : 
+            op(op), 
+            lhs(std::move(lhs)), 
+            rhs(std::move(rhs)) 
+        {}
+        
+        char getOperator() const { return op; }
+        const ExprAST& getLeftHandSide() const { return *lhs; }
+        const ExprAST& getRightHandSide() const { return *rhs; }
+        
+        void accept(ASTVisitor* visitor) override;
     };
 
-    class FuncCallExprAST : public ExprAST {  //call(int a, int b)
-        std::string Callee;
-        std::vector<std::unique_ptr<ExprAST>> Args;
-
+    // Function Call Expression
+    class FuncCallExprAST : public ExprAST {
+    private:
+        std::string callee;
+        std::vector<std::unique_ptr<ExprAST>> args;
+    
     public:
-        FuncCallExprAST(const std::string &Callee, std::vector<std::unique_ptr<ExprAST>> Args)
-            : Callee(Callee), Args(std::move(Args)) {}
-        const std::string& getCallee() const { return Callee; }
-        const std::vector<std::unique_ptr<ExprAST>>& getArgs() const { return Args; }
+        FuncCallExprAST(
+            std::string callee, 
+            std::vector<std::unique_ptr<ExprAST>> args
+        ) : 
+            callee(std::move(callee)), 
+            args(std::move(args)) 
+        {}
+        
+        const std::string& getCallee() const { return callee; }
+        const std::vector<std::unique_ptr<ExprAST>>& getArgs() const { return args; }
+        
+        void accept(ASTVisitor* visitor) override;
     };
 
+    // Function Prototype
     class FuncPrototypeAST {
-        std::string Name;
-        std::vector<std::string> Args;
-
+    private:
+        std::string name;
+        std::vector<std::string> args;
+    
     public:
-        FuncPrototypeAST(const std::string &Name, std::vector<std::string> Args) 
-            : Name(Name), Args(std::move(Args)) {}
-        const std::string& getName() const { return Name; }
-        const std::vector<std::string>& getArgs() const { return Args; }
+        FuncPrototypeAST(
+            std::string name, 
+            std::vector<std::string> args
+        ) : 
+            name(std::move(name)), 
+            args(std::move(args)) 
+        {}
+        
+        const std::string& getName() const { return name; }
+        const std::vector<std::string>& getArgs() const { return args; }
     };
 
+    // Function AST
     class FunctionAST {
-        std::unique_ptr<FuncPrototypeAST> Proto;
-        std::unique_ptr<ExprAST> Body;
-
+    private:
+        std::unique_ptr<FuncPrototypeAST> prototype;
+        std::unique_ptr<ExprAST> body;
+    
     public:
-        FunctionAST(std::unique_ptr<FuncPrototypeAST> Proto, std::unique_ptr<ExprAST> Body)
-            : Proto(std::move(Proto)), Body(std::move(Body)) {}
-        FuncPrototypeAST* getProto() const { return Proto.get(); }
-        ExprAST* getBody() const { return Body.get(); }
+        FunctionAST(
+            std::unique_ptr<FuncPrototypeAST> prototype, 
+            std::unique_ptr<ExprAST> body
+        ) : 
+            prototype(std::move(prototype)), 
+            body(std::move(body)) 
+        {}
+        
+        const FuncPrototypeAST& getPrototype() const { return *prototype; }
+        const ExprAST& getBody() const { return *body; }
     };
+
+    // Abstract Visitor for AST Traversal
+    class ASTVisitor {
+    public:
+        virtual void visitIntExpr(IntExprAST* node) = 0;
+        virtual void visitVariableExpr(VariableExprAST* node) = 0;
+        virtual void visitBinaryExpr(BinaryExprAST* node) = 0;
+        virtual void visitFuncCallExpr(FuncCallExprAST* node) = 0;
+        virtual ~ASTVisitor() = default;
+    };
+
+    // Visitor Method Implementations
+    inline void IntExprAST::accept(ASTVisitor* visitor) { 
+        visitor->visitIntExpr(this); 
+    }
+
+    inline void VariableExprAST::accept(ASTVisitor* visitor) { 
+        visitor->visitVariableExpr(this); 
+    }
+
+    inline void BinaryExprAST::accept(ASTVisitor* visitor) { 
+        visitor->visitBinaryExpr(this); 
+    }
+
+    inline void FuncCallExprAST::accept(ASTVisitor* visitor) { 
+        visitor->visitFuncCallExpr(this); 
+    }
 }
