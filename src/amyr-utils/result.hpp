@@ -38,7 +38,7 @@ public:
     }
 
     
-    //Check if Result is Ok
+    //Check if Result is Err
     inline bool is_err() const {
         return std::holds_alternative<E>(value_);
     }
