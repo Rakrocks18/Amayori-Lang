@@ -11,8 +11,10 @@
 #include<iostream>
 #include<functional>
 #include<stdexcept>
+#include<ranges>
 
 #include "amyr-debug-utils/unreachable.hpp"
+#include "amyr-utils/result.hpp"
 
 
 enum EscapeError {
@@ -84,7 +86,7 @@ bool is_fatal(EscapeError error) {
     Determines if an error is fatal
     */
 
-    return error != EscapeError::UnskippedWhitespaceWarning &&
+    return error != EscapeError::UnskippedWhitespaceWarning ||
            error != EscapeError::MultipleSkippedLinesWarning;
 }
 
@@ -206,27 +208,55 @@ const std::string prefix_noraw(Mode mode) {
     }
 }
 
-template <typename T>
-void scan_escape(std::string::const_iterator& chars, std::string::const_iterator end, Mode mode, T& result) {
-    // Implementation of scan_escape, handle escape sequences
-    if (chars == end) throw EscapeError::InvalidEscape;
-    char next = *chars++;
-    switch (next) {
-        case 'n':
-            result = from_char<T>('\n');
-            break;
-        case 'r':
-            result = from_char<T>('\r');
-            break;
-        case 't':
-            result = from_char<T>('\t');
-            break;
-        case '\\':
-            result = from_char<T>('\\');
-            break;
-        default:
-            throw EscapeError::InvalidEscape;
+
+Result<MixedUnit, EscapeError> scan_escape(std::string::iterator& it, std::string::iterator end, Mode mode, int xyz) {
+    // Previous character was '\\', unescape what follows.
+    char res;
+    char c;
+    if (it == end) {
+        return Result<MixedUnit, EscapeError>::Err(LoneSlash);
+    } else {
+        c = *it++;
     }
+
+    switch (c) {
+        case '"' : res = '"'; break;
+        case 'n' : res = '\n'; break;
+        case 'r' : res = '\r'; break;
+        case 't' : res = '\t'; break;
+        case '\\' : res = '\\'; break;
+        case '\'' : res = '\''; break;
+        case '0' : res = '\0'; break;
+        case 'x' : {
+            //Parse Hexadeecimal character code
+            if (std::distance(it, end) < 2) {
+                return Result<MixedUnit, EscapeError>::Err(TooShortHexEscape);
+            }
+
+            char hi = *it++;
+            char lo = *it++;
+            if (!std::isxdigit(hi) || !std::isxdigit(lo)) {
+                return Result<MixedUnit, EscapeError>::Err(InvalidCharInHexEscape);
+            }
+
+            int value = (std::stoi(std::string(1, hi), nullptr, 16) << 4) + std::stoi(std::string(1, lo), nullptr, 16);
+
+            if (value > 127 && mode != Mode::Byte) {
+                return Result<MixedUnit, EscapeError>::Err(OutOfRangeHexEscape);
+            }
+
+            return Result<MixedUnit, EscapeError>::Ok(MixedUnit(static_cast<char>(value)));
+        }
+
+        case 'u' : {
+            return scan_unicode(it, end, allow_unicode_escapes(mode));
+        }
+        default: return Result<MixedUnit, EscapeError>::Err(InvalidEscape);
+
+    }
+
+    return Result<MixedUnit, EscapeError>::Ok(MixedUnit(res));
+    
 }
 
 
@@ -270,11 +300,107 @@ private:
 MixedUnit to_mixed_unit(char c) { return MixedUnit(c); }
 MixedUnit to_mixed_unit(uint8_t b) { return MixedUnit(b); }
 
-inline std::variant<char, EscapeError> ascii_check(char c, bool allow_unicode_characters) {
+
+inline Result<char, EscapeError> ascii_check(char c, bool allow_unicode_characters) {
     if (allow_unicode_characters || static_cast<unsigned char>(c) < 128) {
-        return c;
+        return Result<char, EscapeError>::Ok(c);
     } else {
-        return EscapeError::NonAsciiCharInByte;
+        return Result<char, EscapeError>::Err(NonAsciiCharInByte);
     }
 }
 
+void unescape_unicode(std::string& src, Mode mode, std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {
+    switch (mode)
+    {
+        case Mode::Char:
+        case Mode::Byte:
+            std::string::iterator it = src.begin();
+            Result<MixedUnit, EscapeError> res = Result<MixedUnit, EscapeError>::Ok(MixedUnit(unescape_char_or_byte(it, src.end(), mode).unwrap()));
+            callback({0, static_cast<size_t>(std::distance(src.begin(), it))}, res);
+            break;
+
+        case Mode::Str:
+        case Mode::ByteStr:
+            unescape_non_raw_common(src, mode, callback);
+            break;
+
+    }
+}
+
+Result<char, EscapeError> unescape_char_or_byte(std::string::iterator &it, const std::string::const_iterator &end, Mode mode) {
+    if (it == end) {
+        return Result<char, EscapeError>::Err(EscapeError::ZeroChars);
+    }
+
+    char c = *it++;
+    Result<char, EscapeError> res;
+    switch (c) {
+        case '\\':
+            if (it == end) {
+                return Result<char, EscapeError>::Err(InvalidEscape);
+            }
+
+            c = *it++;
+            switch (c) {
+                case 'n': res = Result<char, EscapeError>::Ok('\n'); break;
+                case 't': res = Result<char, EscapeError>::Ok('\t'); break;
+                case 'r': res = Result<char, EscapeError>::Ok('\r'); break;
+                case '\\': res = Result<char, EscapeError>::Ok('\\'); break;
+                default: res = Result<char, EscapeError>::Err(InvalidEscape); break;
+            }
+            break;
+
+        case '\n':
+        case '\t':
+        case '\'':
+            res = Result<char, EscapeError>::Err(EscapeOnlyChar);
+            break;
+
+        case '\r':
+            res = Result<char, EscapeError>::Err(BareCarriageReturn);
+            break;
+
+        default:
+            res = ascii_check(c, allow_unicode_chars(mode));
+            break;
+    }
+
+    
+
+    if (it != end) {
+        return Result<char, EscapeError>::Err(MoreThanOneChar);
+    }
+
+    return res;
+    
+}
+
+/* 
+Takes a contents of a string literal (without quotes) and produces a sequence of escaped characters or errors
+*/
+void unescape_non_raw_common(std::string& src, Mode mode, 
+                                std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {
+    
+    std::string::iterator it = src.begin();
+    std::string::iterator end = src.end();
+    bool allow_unicode_chars_ = allow_unicode_chars(mode);
+
+    while (it != end) {
+        size_t  start = std::distance(src.begin(), it);
+        Result<MixedUnit, EscapeError> res;
+
+        char c = *it++;
+        if(c = '\\') {
+            if (it != end && *it == '\n') {
+                ++it;
+                skip_ascii_whitespace(it, end, start, callback);
+                continue;
+            } else {
+                res = scan_escape(it, end, mode, 0);
+            }   
+        }
+
+    }
+}
+
+void skip_ascii_whitespace(std::string::iterator& it, std::string::iterator& end, size_t start, std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {}

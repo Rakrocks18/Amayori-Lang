@@ -19,6 +19,9 @@ class Result {
 
 public:
 
+    //Empty initializer
+    Result() : value_(std::monostate{}) {}
+
     //Constructors for Ok() and Err()
     static Result<T, E> Ok(T value) {
         return Result(std::move(value));
@@ -38,6 +41,11 @@ public:
     //Check if Result is Ok
     inline bool is_err() const {
         return std::holds_alternative<E>(value_);
+    }
+
+    //check if Reuslt is empty
+    inline bool is_empty() const {
+        return std::holds_alternative<std::monostate>(value_);
     }
 
 
