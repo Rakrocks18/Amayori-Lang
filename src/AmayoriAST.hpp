@@ -1,6 +1,3 @@
-//
-// Created by vivek on 10-10-2024.
-//
 #pragma once
 #include <memory>
 #include <string>
@@ -12,8 +9,27 @@ namespace node {
     // Forward declarations
     class ASTVisitor;
 
-    // Base Expression AST with Visitor support
+    // Borrow checking types
+    enum class BorrowKind {
+        None,
+        Shared,    // &
+        Mutable,   // &mut
+        Move       // ownership transfer
+    };
+
+    struct BorrowInfo {
+        BorrowKind kind = BorrowKind::None;
+        bool is_mutable = false;
+        std::string scope_id;
+    };
+
+    // Base Expression AST with Visitor support and borrow checking
     class ExprAST {
+    protected:
+        BorrowInfo borrow_info;
+        bool has_error = false;
+        std::string error_message;
+
     public:
         virtual ~ExprAST() = default;
         
@@ -21,8 +37,17 @@ namespace node {
         virtual void accept(ASTVisitor* visitor) = 0;
         
         // Error handling
-        virtual bool hasError() const { return false; }
-        virtual std::string getErrorMessage() const { return ""; }
+        virtual bool hasError() const { return has_error; }
+        virtual std::string getErrorMessage() const { return error_message; }
+
+        // Borrow checking support
+        void setBorrowKind(BorrowKind kind) { borrow_info.kind = kind; }
+        void setMutable(bool is_mut) { borrow_info.is_mutable = is_mut; }
+        void setScopeId(const std::string& scope) { borrow_info.scope_id = scope; }
+        
+        BorrowKind getBorrowKind() const { return borrow_info.kind; }
+        bool isMutable() const { return borrow_info.is_mutable; }
+        const std::string& getScopeId() const { return borrow_info.scope_id; }
     };
 
     // Integer Expression
@@ -31,10 +56,11 @@ namespace node {
         int val;
         
     public:
-        explicit IntExprAST(int val) : val(val) {}
+        explicit IntExprAST(int val) : val(val) {
+            setBorrowKind(BorrowKind::None); // Literals don't need borrowing
+        }
         
         int getValue() const { return val; }
-        
         void accept(ASTVisitor* visitor) override;
     };
 
@@ -44,15 +70,34 @@ namespace node {
         std::string name;
     
     public:
-        explicit VariableExprAST(std::string name) : name(std::move(name)) {}
+        explicit VariableExprAST(std::string name) : name(std::move(name)) {
+            setBorrowKind(BorrowKind::Shared); // Default to shared borrow
+        }
         
         const std::string& getName() const { return name; }
+        void accept(ASTVisitor* visitor) override;
+    };
+
+    // Let Expression for variable declarations
+    class LetExprAST : public ExprAST {
+    private:
+        std::string name;
+        std::unique_ptr<ExprAST> init_expr;
+    
+    public:
+        LetExprAST(std::string name, bool is_mut, std::unique_ptr<ExprAST> init)
+            : name(std::move(name)), init_expr(std::move(init)) {
+            setMutable(is_mut);
+            setBorrowKind(BorrowKind::None);
+        }
         
+        const std::string& getName() const { return name; }
+        const ExprAST& getInitExpr() const { return *init_expr; }
         void accept(ASTVisitor* visitor) override;
     };
 
     // Binary Operation Expression
-    class BinaryExprAST : public ExprAST {  //Previously it was returning raw pointers, which could lead to ownership confusion, therefore added a unique pointer for managing memory
+    class BinaryExprAST : public ExprAST {
     private:
         char op;
         std::unique_ptr<ExprAST> lhs;
@@ -67,7 +112,9 @@ namespace node {
             op(op), 
             lhs(std::move(lhs)), 
             rhs(std::move(rhs)) 
-        {}
+        {
+            setBorrowKind(BorrowKind::None);
+        }
         
         char getOperator() const { return op; }
         const ExprAST& getLeftHandSide() const { return *lhs; }
@@ -89,7 +136,9 @@ namespace node {
         ) : 
             callee(std::move(callee)), 
             args(std::move(args)) 
-        {}
+        {
+            setBorrowKind(BorrowKind::None);
+        }
         
         const std::string& getCallee() const { return callee; }
         const std::vector<std::unique_ptr<ExprAST>>& getArgs() const { return args; }
@@ -97,23 +146,31 @@ namespace node {
         void accept(ASTVisitor* visitor) override;
     };
 
-    // Function Prototype
+    // Function Prototype with borrow checking information
     class FuncPrototypeAST {
     private:
         std::string name;
         std::vector<std::string> args;
+        std::vector<BorrowInfo> arg_borrow_info;  // Borrow info for each argument
     
     public:
         FuncPrototypeAST(
             std::string name, 
-            std::vector<std::string> args
+            std::vector<std::string> args,
+            std::vector<BorrowInfo> arg_borrows = {}
         ) : 
             name(std::move(name)), 
-            args(std::move(args)) 
-        {}
+            args(std::move(args)),
+            arg_borrow_info(std::move(arg_borrows))
+        {
+            if (arg_borrow_info.empty()) {
+                arg_borrow_info.resize(this->args.size(), BorrowInfo{});
+            }
+        }
         
         const std::string& getName() const { return name; }
         const std::vector<std::string>& getArgs() const { return args; }
+        const std::vector<BorrowInfo>& getArgBorrowInfo() const { return arg_borrow_info; }
     };
 
     // Function AST
@@ -140,6 +197,7 @@ namespace node {
     public:
         virtual void visitIntExpr(IntExprAST* node) = 0;
         virtual void visitVariableExpr(VariableExprAST* node) = 0;
+        virtual void visitLetExpr(LetExprAST* node) = 0;
         virtual void visitBinaryExpr(BinaryExprAST* node) = 0;
         virtual void visitFuncCallExpr(FuncCallExprAST* node) = 0;
         virtual ~ASTVisitor() = default;
@@ -152,6 +210,10 @@ namespace node {
 
     inline void VariableExprAST::accept(ASTVisitor* visitor) { 
         visitor->visitVariableExpr(this); 
+    }
+
+    inline void LetExprAST::accept(ASTVisitor* visitor) { 
+        visitor->visitLetExpr(this); 
     }
 
     inline void BinaryExprAST::accept(ASTVisitor* visitor) { 

@@ -12,31 +12,30 @@
 #include <unordered_map>  //Automatically identifies language keywords
 
 enum class TokenType {
+    // Keywords
+    Let,
+    Mut,
+    Func,
+    Return,
+    If,
+    Else,
+    
     // Literals
+    Identifier,
     Integer,
     Float,
-    Identifier,
-
-    // Operators
+    
+    // Operators and delimiters
+    Equals,
+    RightBrace,
+    LeftBrace,
+    LeftParen,
+    RightParen,
     Plus,
     Minus,
     Star,
     Slash,
-    Equals,
-
-    // Delimiters
-    LeftParen,
-    RightParen,
     Semicolon,
-
-    // Keywords
-    Func,
-    Return,
-    Let,
-    If,
-    Else,
-
-    // Special
     EOF_TOKEN
 };
 
@@ -192,9 +191,10 @@ public:
 
 // Static keyword initialization
 const std::unordered_map<std::string, TokenType> Tokenizer::keywords = {
+    {"let", TokenType::Let},
+    {"mut", TokenType::Mut},
     {"func", TokenType::Func},
     {"return", TokenType::Return},
-    {"let", TokenType::Let},
     {"if", TokenType::If},
     {"else", TokenType::Else}
 };
