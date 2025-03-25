@@ -415,79 +415,129 @@ void unescape_unicode(std::string& src, Mode mode, std::function<void(std::pair<
     }
 }
 
-Result<char, EscapeError> unescape_char_or_byte(std::string::iterator &it, const std::string::const_iterator &end, Mode mode) {
+Result<char, EscapeError> unescape_char_or_byte(std::string::iterator& it, 
+            const std::string::iterator& end, 
+            Mode mode) {
     if (it == end) {
         return Result<char, EscapeError>::Err(EscapeError::ZeroChars);
     }
 
     char c = *it++;
     Result<char, EscapeError> res;
+
     switch (c) {
-        case '\\':
+        case '\\': {
+            // Handle escape sequences
             if (it == end) {
-                return Result<char, EscapeError>::Err(InvalidEscape);
+                return Result<char, EscapeError>::Err(EscapeError::LoneSlash);
             }
 
-            c = *it++;
-            switch (c) {
-                case 'n': res = Result<char, EscapeError>::Ok('\n'); break;
-                case 't': res = Result<char, EscapeError>::Ok('\t'); break;
-                case 'r': res = Result<char, EscapeError>::Ok('\r'); break;
-                case '\\': res = Result<char, EscapeError>::Ok('\\'); break;
-                default: res = Result<char, EscapeError>::Err(InvalidEscape); break;
+            ResultEsc<MixedUnit> esc_result = scan_escape(it, end, mode);
+            if (esc_result.is_err()) {
+                return Result<char, EscapeError>::Err(esc_result.unwrap_err());
+            }
+
+            MixedUnit unit = esc_result.unwrap();
+            if (unit.is_char()) {
+                res = Result<char, EscapeError>::Ok(unit.as_char());
+            } else {
+                // For byte mode, convert high byte to char
+                if (mode == Mode::Byte || mode == Mode::ByteStr) {
+                    res = Result<char, EscapeError>::Ok(
+                    static_cast<char>(unit.as_high_byte())
+                    );
+                } else {
+                    return Result<char, EscapeError>::Err(
+                    EscapeError::NonAsciiCharInByte
+                    );
+                }
             }
             break;
+        }
 
         case '\n':
         case '\t':
-        case '\'':
-            res = Result<char, EscapeError>::Err(EscapeOnlyChar);
+        case '\'': {
+            res = Result<char, EscapeError>::Err(EscapeError::EscapeOnlyChar);
             break;
+        }
 
-        case '\r':
-            res = Result<char, EscapeError>::Err(BareCarriageReturn);
+        case '\r': {
+            res = Result<char, EscapeError>::Err(EscapeError::BareCarriageReturn);
             break;
+        }
 
-        default:
-            res = ascii_check(c, allow_unicode_chars(mode));
+        default: {
+        // Check ASCII validity for byte modes
+            ResultEsc<char> checked = ascii_check(c, allow_unicode_chars(mode));
+                if (checked.is_ok()) {
+                res = Result<char, EscapeError>::Ok(checked.unwrap());
+            } else {
+                res = Result<char, EscapeError>::Err(checked.unwrap_err());
+            }
             break;
+        }
     }
 
-    
-
+    // Check for trailing characters
     if (it != end) {
-        return Result<char, EscapeError>::Err(MoreThanOneChar);
+        return Result<char, EscapeError>::Err(EscapeError::MoreThanOneChar);
     }
 
     return res;
-    
 }
 
 /* 
 Takes a contents of a string literal (without quotes) and produces a sequence of escaped characters or errors
 */
 void unescape_non_raw_common(std::string& src, Mode mode, 
-                                std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {
-    
-    std::string::iterator it = src.begin();
-    std::string::iterator end = src.end();
-    bool allow_unicode_chars_ = allow_unicode_chars(mode);
+        std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {
+    auto it = src.begin();
+    auto end = src.end();
+    bool allow_unicode = allow_unicode_chars(mode);
 
     while (it != end) {
-        size_t  start = std::distance(src.begin(), it);
+        size_t start = std::distance(src.begin(), it);
         Result<MixedUnit, EscapeError> res;
-
         char c = *it++;
-        if(c = '\\') {
-            if (it != end && *it == '\n') {
-                ++it;
-                skip_ascii_whitespace(it, end, start, callback);
-                continue;
-            } else {
-                res = scan_escape(it, end, mode);
-            }   
+
+        if (c == '\\') {
+        // Handle escaped newline and whitespace skipping
+        if (it != end && *it == '\n') {
+            ++it; // Skip newline
+            skip_ascii_whitespace(src, it, end, start, callback);
+            continue;
         }
 
+        // Process escape sequence
+        auto escape_start = it-1;
+        auto scan_res = scan_escape(it, end, mode);
+        size_t escape_end = std::distance(src.begin(), it);
+
+        if (scan_res.is_ok()) {
+            res = scan_res;
+        } else {
+            res = Result<MixedUnit, EscapeError>::Err(scan_res.unwrap_err());
+        }
+            callback({start, escape_end}, res);
+            continue;
+        }
+
+        // Handle normal characters
+        if (c == '"') {
+            res = Result<MixedUnit, EscapeError>::Err(EscapeError::EscapeOnlyChar);
+        } else if (c == '\r') {
+            res = Result<MixedUnit, EscapeError>::Err(EscapeError::BareCarriageReturn);
+        } else {
+            auto check_res = ascii_check(c, allow_unicode);
+            if (check_res.is_ok()) {
+                res = Result<MixedUnit, EscapeError>::Ok(MixedUnit(check_res.unwrap()));
+            } else {
+                res = Result<MixedUnit, EscapeError>::Err(check_res.unwrap_err());
+            }
+        }
+
+        callback({start, start + 1}, res);
     }
 }
 
@@ -502,4 +552,81 @@ void check_raw_common(std::string &src, Mode mode, std::function<void(std::pair<
 }
 
 
-void skip_ascii_whitespace(std::string::iterator& it, std::string::iterator& end, size_t start, std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {}
+void skip_ascii_whitespace(std::string& src, 
+        std::string::iterator& it, 
+        std::string::iterator end, 
+        size_t start,
+        std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {
+    
+    size_t first_non_space = 0;
+    std::string_view tail(it, end);
+
+    // Find first non-whitespace
+    while (first_non_space < tail.size() && 
+    (tail[first_non_space] == ' ' || 
+    tail[first_non_space] == '\t' || 
+    tail[first_non_space] == '\r')) {
+        first_non_space++;
+    }
+
+    // Check for multiple newlines
+    if (tail.substr(0, first_non_space).find('\n') != std::string_view::npos) {
+        callback({start, start + first_non_space + 1}, 
+        Result<MixedUnit, EscapeError>::Err(EscapeError::MultipleSkippedLinesWarning));
+    }
+
+    // Check for remaining whitespace
+    if (first_non_space < tail.size() && 
+    (tail[first_non_space] == ' ' || tail[first_non_space] == '\t')) {
+        callback({start, start + first_non_space + 1},
+        Result<MixedUnit, EscapeError>::Err(EscapeError::UnskippedWhitespaceWarning));
+    }
+
+    // Advance iterator
+    std::advance(it, first_non_space);
+}
+
+void check_raw_common(std::string &src, Mode mode, 
+        std::function<void(std::pair<size_t, size_t>, ResultEsc<MixedUnit>)> &callback) {
+    auto it = src.begin();
+    auto end = src.end();
+    bool allow_unicode = allow_unicode_chars(mode);
+
+    while (it != end) {
+        size_t start = std::distance(src.begin(), it);
+        char c = *it++;
+        ResultEsc<MixedUnit> res;
+
+        if (c == '\r') {
+            res = ResultEsc<MixedUnit>::Err(EscapeError::BareCarriageReturnInRawString);
+        } else {
+            auto check_res = ascii_check(c, allow_unicode);
+            if (check_res.is_ok()) {
+                res = ResultEsc<MixedUnit>::Ok(MixedUnit(check_res.unwrap()));
+            } else {
+                res = ResultEsc<MixedUnit>::Err(check_res.unwrap_err());
+            }
+        }
+
+        callback({start, start + 1}, res);
+    }
+}
+
+void unescape_mixed(std::string& src, Mode mode,
+        std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> &callback) {
+    
+    if (mode != Mode::CStr) UNREACHABLE();
+
+    // Create a named intermediate callback
+    std::function<void(std::pair<size_t, size_t>, Result<MixedUnit, EscapeError>)> wrapper = 
+            [&](std::pair<size_t, size_t> range, Result<MixedUnit, EscapeError> result) {
+        
+        if (result.is_ok() && result.unwrap().is_char() && result.unwrap().as_char() == '\0') {
+            callback(range, Result<MixedUnit, EscapeError>::Err(EscapeError::NulInCStr));
+        } else {
+            callback(range, result);
+        }
+    };
+
+    unescape_non_raw_common(src, mode, wrapper);
+}
