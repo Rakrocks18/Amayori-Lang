@@ -6,7 +6,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Verifier.h"
-#include "AmayoriAST.hpp"
+#include "./AmayoriAST.hpp"
 
 using namespace llvm;
 
@@ -25,9 +25,9 @@ public:
     if (auto* IntExpr = dynamic_cast<node::IntExprAST*>(Expr)) {
         return ConstantInt::get(*TheContext, APInt(32, IntExpr->getVal(), true));
     }
-    if (auto* BinaryExpr = dynamic_cast<node::BinaryExprAST*>(Expr)) {
-        Value* L = generateIR(BinaryExpr->getLHS());
-        Value* R = generateIR(BinaryExpr->getRHS());
+    if (node::BinaryExprAST* BinaryExpr = dynamic_cast<node::BinaryExprAST*>(Expr)) {
+        Value* L = generateIR(&BinaryExpr->getLHS());
+        Value* R = generateIR(&BinaryExpr->getRHS());
         if (!L || !R) return nullptr;
 
         switch (BinaryExpr->getOp()) {
@@ -51,7 +51,7 @@ public:
         Builder->SetInsertPoint(BB);
 
         // Generate IR for function body
-        if (Value* RetVal = generateIR(FnAST->getBody())) {
+        if (Value* RetVal = generateIR(&FnAST->getBody())) {
             Builder->CreateRet(RetVal);
             verifyFunction(*F);
             return F;

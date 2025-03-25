@@ -33,7 +33,7 @@ namespace node {
     public:
         explicit IntExprAST(int val) : val(val) {}
         
-        int getValue() const { return val; }
+        int getVal() const { return val; }
         
         void accept(ASTVisitor* visitor) override;
     };
@@ -69,9 +69,9 @@ namespace node {
             rhs(std::move(rhs)) 
         {}
         
-        char getOperator() const { return op; }
-        const ExprAST& getLeftHandSide() const { return *lhs; }
-        const ExprAST& getRightHandSide() const { return *rhs; }
+        char getOp() const { return op; }
+        ExprAST& getLHS() const { return *lhs; }
+        ExprAST& getRHS() const { return *rhs; }
         
         void accept(ASTVisitor* visitor) override;
     };
@@ -131,8 +131,8 @@ namespace node {
             body(std::move(body)) 
         {}
         
-        const FuncPrototypeAST& getPrototype() const { return *prototype; }
-        const ExprAST& getBody() const { return *body; }
+        const FuncPrototypeAST& getProto() const { return *prototype; }
+        ExprAST& getBody() const { return *body; }
     };
 
     // Abstract Visitor for AST Traversal
