@@ -24,5 +24,3 @@ add_executable(amayori-llvm ${SOURCES})
 # Link against LLVM libraries
 llvm_map_components_to_libnames(llvm_libs support core irreader)
 target_link_libraries(amayori-llvm ${llvm_libs})
-
-add_subdirectory(src/amyr-borrow-check)

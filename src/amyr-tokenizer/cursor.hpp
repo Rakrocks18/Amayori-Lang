@@ -8,6 +8,7 @@ and position can be shifted forward by the bump method
 #include<stddef.h>
 #include<string>
 #include<string_view>
+#include<optional>
 
 class Cursor {
 
@@ -85,7 +86,7 @@ public:
     /*
     Moves to next char
     */
-    char bump() {
+    std::optional<char> bump() {
         if (pos_ < input_.length()) {
             char c = input_[pos_++];
             
