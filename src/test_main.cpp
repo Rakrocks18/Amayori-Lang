@@ -28,10 +28,10 @@ TEST_F(TokenizerTest, BasicTokenization) {
 // Parser Tests
 class ParserTest : public ::testing::Test {
 protected:
-    std::unique_ptr<node::ExprAST> parse(const std::string& source) {
+    std::shared_ptr<node::ExprAST> parse(const std::string& source) {
         Tokenizer tokenizer(source);
         auto tokens = tokenizer.tokenize();
-        Parser parser(std::move(tokens));
+        node::Parser parser(std::move(tokens));
         return parser.parse();
     }
 };
@@ -44,9 +44,9 @@ TEST_F(ParserTest, BasicParsing) {
     ASSERT_NE(let_expr, nullptr);
     EXPECT_EQ(let_expr->getName(), "x");
     
-    auto* init_expr = dynamic_cast<node::IntExprAST*>(&let_expr->getInitExpr());
+    auto* init_expr = dynamic_cast<node::IntExprAST*>(let_expr->getInitExpr().get());
     ASSERT_NE(init_expr, nullptr);
-    EXPECT_EQ(init_expr->getValue(), 42);
+    EXPECT_EQ(init_expr->getVal(), 42);
 }
 
 // Borrow Checker Tests
@@ -54,10 +54,10 @@ class BorrowCheckerTest : public ::testing::Test {
 protected:
     amyr::borrow::BorrowChecker checker;
     
-    std::unique_ptr<node::ExprAST> parse(const std::string& source) {
+    std::shared_ptr<node::ExprAST> parse(const std::string& source) {
         Tokenizer tokenizer(source);
         auto tokens = tokenizer.tokenize();
-        Parser parser(std::move(tokens));
+        node::Parser parser(std::move(tokens));
         return parser.parse();
     }
     
@@ -87,7 +87,10 @@ TEST_F(BorrowCheckerTest, BasicBorrowChecking) {
 class IRGeneratorTest : public ::testing::Test {
 protected:
     void verifyIR(const std::string& source) {
-        auto ast = parse(source);
+        Tokenizer tokenizer(source);
+        auto tokens = tokenizer.tokenize();
+        node::Parser parser(std::move(tokens));
+        auto ast = parser.parse();
         IRGenerator generator;
         auto* value = generator.generateIR(ast.get());
         ASSERT_NE(value, nullptr);
@@ -113,7 +116,7 @@ TEST(IntegrationTest, CompleteCompilation) {
     auto tokens = tokenizer.tokenize();
     ASSERT_FALSE(tokens.empty());
     
-    Parser parser(std::move(tokens));
+    node::Parser parser(std::move(tokens));
     auto ast = parser.parse();
     ASSERT_NE(ast, nullptr);
     
@@ -135,7 +138,7 @@ TEST(ErrorHandlingTest, ParserErrors) {
     const char* invalid_code = "let;"; // Missing identifier
     Tokenizer tokenizer(invalid_code);
     auto tokens = tokenizer.tokenize();
-    Parser parser(std::move(tokens));
+    node::Parser parser(std::move(tokens));
     EXPECT_THROW(parser.parse(), std::runtime_error);
 }
 

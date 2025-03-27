@@ -1,7 +1,110 @@
 #include "BorrowChecker.hpp"
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <stdexcept>
+#include <cassert>
 
 namespace amyr {
 namespace borrow {
+
+// TwoPhaseActivation enum
+enum class TwoPhaseActivation {
+    NotTwoPhase,
+    NotActivated,
+    ActivatedAt
+};
+
+// BorrowData structure
+struct BorrowData {
+    Location reserve_location;
+    TwoPhaseActivation activation_location;
+    BorrowKind kind;
+    std::string region;
+    std::string borrowed_place;
+    std::string assigned_place;
+
+    BorrowData(Location reserve, TwoPhaseActivation activation, BorrowKind kind,
+               std::string region, std::string borrowed, std::string assigned)
+        : reserve_location(reserve), activation_location(activation), kind(kind),
+          region(std::move(region)), borrowed_place(std::move(borrowed)),
+          assigned_place(std::move(assigned)) {}
+};
+
+// BorrowSet class
+class BorrowSet {
+public:
+    std::unordered_map<Location, BorrowData> location_map;
+    std::unordered_map<Location, std::vector<int>> activation_map;
+    std::unordered_map<std::string, std::unordered_set<int>> local_map;
+
+    void add_borrow(Location location, BorrowData borrow) {
+        location_map[location] = std::move(borrow);
+    }
+
+    void add_activation(Location location, int borrow_index) {
+        activation_map[location].push_back(borrow_index);
+    }
+
+    void add_local_borrow(const std::string& local, int borrow_index) {
+        local_map[local].insert(borrow_index);
+    }
+
+    const BorrowData& get_borrow(int index) const {
+        auto it = location_map.begin();
+        std::advance(it, index);
+        return it->second;
+    }
+
+    size_t size() const {
+        return location_map.size();
+    }
+};
+
+// BorrowChecker class
+class BorrowChecker {
+private:
+    BorrowSet borrow_set;
+    std::vector<Violation> errors;
+
+    void check_borrow(const BorrowData& borrow) {
+        if (borrow.kind == BorrowKind::Mutable && borrow.activation_location == TwoPhaseActivation::ActivatedAt) {
+            errors.emplace_back(ViolationType::BorrowWhileMutable,
+                                "Cannot mutably borrow '" + borrow.borrowed_place + "' while it is already borrowed",
+                                borrow.reserve_location.line);
+        }
+    }
+
+public:
+    bool check(const node::ExprAST* ast) {
+        errors.clear();
+        check_expr(ast);
+        return errors.empty();
+    }
+
+    void check_expr(const node::ExprAST* expr) {
+        if (auto* binary = dynamic_cast<const node::BinaryExprAST*>(expr)) {
+            check_expr(binary->getLHS());
+            check_expr(binary->getRHS());
+        } else if (auto* var = dynamic_cast<const node::VariableExprAST*>(expr)) {
+            check_variable(var);
+        }
+    }
+
+    void check_variable(const node::VariableExprAST* var) {
+        auto it = borrow_set.local_map.find(var->getName());
+        if (it != borrow_set.local_map.end()) {
+            for (int borrow_index : it->second) {
+                const BorrowData& borrow = borrow_set.get_borrow(borrow_index);
+                check_borrow(borrow);
+            }
+        }
+    }
+
+    const std::vector<Violation>& get_errors() const {
+        return errors;
+    }
+};
 
 void OwnershipTracker::exit_scope() {
     for (auto it = ownership_map.begin(); it != ownership_map.end();) {
@@ -69,34 +172,5 @@ bool OwnershipTracker::mark_moved(const std::string& name) {
     return true;
 }
 
-bool BorrowChecker::check(const node::ExprAST* ast) {
-    clear_errors();
-    check_expr(ast);
-    return errors.empty();
-}
-
-void BorrowChecker::check_expr(const node::ExprAST* expr) {
-    if (auto* binary = dynamic_cast<const node::BinaryExprAST*>(expr)) {
-        check_binary(binary);
-    } else if (auto* var = dynamic_cast<const node::VariableExprAST*>(expr)) {
-        check_variable(var);
-    }
-}
-
-void BorrowChecker::check_binary(const node::BinaryExprAST* expr) {
-    check_expr(expr->getLHS());
-    check_expr(expr->getRHS());
-}
-
-void BorrowChecker::check_variable(const node::VariableExprAST* expr) {
-    if (!tracker.can_borrow(expr->getName(), BorrowKind::Shared)) {
-        errors.emplace_back(
-            ViolationType::BorrowWhileMutable,
-            "Cannot borrow variable '" + expr->getName() + "' - already mutably borrowed",
-            0  // Line number not implemented yet
-        );
-    }
-}
-
 } // namespace borrow
-} // namespace amyr 
+} // namespace amyr

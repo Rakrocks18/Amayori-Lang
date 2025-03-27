@@ -3,7 +3,8 @@
 
 #include <string>
 #include <vector>
-#include <map>
+#include <unordered_map>
+#include <unordered_set>
 #include "../parser.hpp"  // Include needed headers instead of self-including
 
 namespace amyr {
@@ -30,40 +31,31 @@ struct Violation {
         : type(t), message(std::move(msg)), line(ln) {}
 };
 
-struct OwnershipData {
-    bool is_mutable;
-    std::vector<std::string> borrowers;
-    int scope_level;
-    bool moved;
+struct Location {
+    int line;
+    int column;
+
+    Location(int l, int c) : line(l), column(c) {}
+
+    bool operator==(const Location& other) const {
+        return line == other.line && column == other.column;
+    }
 };
 
-class OwnershipTracker {
-public:
-    void exit_scope();
-    bool register_variable(const std::string& name, bool is_mut);
-    bool can_borrow(const std::string& name, BorrowKind kind) const;
-    bool register_borrow(const std::string& var, 
-                         const std::string& borrower, 
-                         BorrowKind kind);
-    bool mark_moved(const std::string& name);
-
-private:
-    std::map<std::string, OwnershipData> ownership_map;
-    int current_scope = 0;
+struct LocationHash {
+    std::size_t operator()(const Location& loc) const {
+        return std::hash<int>()(loc.line) ^ std::hash<int>()(loc.column);
+    }
 };
 
 class BorrowChecker {
 public:
     bool check(const node::ExprAST* ast);
-    void check_expr(const node::ExprAST* expr);
-    void check_binary(const node::BinaryExprAST* expr);
-    void check_variable(const node::VariableExprAST* expr);
-    const std::vector<Violation>& get_errors() const { return errors; }
+    const std::vector<Violation>& get_errors() const;
 
 private:
-    void clear_errors() { errors.clear(); }
-    std::vector<Violation> errors;
-    OwnershipTracker tracker;
+    void check_expr(const node::ExprAST* expr);
+    void check_variable(const node::VariableExprAST* var);
 };
 
 } // namespace borrow
