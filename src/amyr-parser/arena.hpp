@@ -122,7 +122,7 @@ private:
         void* end;
 
         Chunk(size_t size) {
-            start = std::aligned_alloc(alignof(std::max_align_t), size);
+            start = std::aligned_alloc(alignof(max_align_t), size);
             if (!start) {
                 throw std::bad_alloc();
             }

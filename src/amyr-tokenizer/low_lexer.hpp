@@ -33,6 +33,8 @@ The following is the official starting comming in compiler/rustc_lexer/src/lib.r
 
 #include "cursor.hpp"
 #include "unicode_escape.hpp"
+#include "amyr-utils/iterator.hpp"
+#include <unicode/uchar.h>
 
 /* Parsed token.
 It doesn't contain information about data that has been parsed,
@@ -371,41 +373,50 @@ std::optional<size_t> strip_shebang(const std::string &input) {
     // Shebang must start with "#!" literally, without any preceding whitespace.
     // For simplicity we consider any line starting with "#!" a shebang,
     // regardless of restrictions put on shebangs by specific platforms.
-    if (input.rfind("#!", 0) == 0) { // check if input starts with "#!"
-        std::string input_tail = input.substr(2);
-        // Ok, this is a shebang but if the next non-whitespace token is '[',
-        // then it may be valid Rust code, so consider it Rust code.
-        std::vector<Token> tokens = tokenize(input_tail);
+    if (input.size() < 2 || input[0] != '#' || input[1] != '!') {
+        return std::nullopt;
+    }
+    
+    std::string input_tail = input.substr(2);
+    // Ok, this is a shebang but if the next non-whitespace token is '[',
+    // then it may be valid Rust code, so consider it Rust code.
+    auto iter = tokenize(input_tail);
+    std::optional<Token> first_significant;
 
-        auto is_skippable = [](const Token &token) -> bool {
-            return std::visit([](auto &&arg) -> bool {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (std::is_same_v<T, Whitespace>) {
-                    return true;
-                } else if constexpr (std::is_same_v<T, LineComment>) {
-                    return !arg.doc_style.has_value();
-                } else if constexpr (std::is_same_v<T, BlockComment>) {
-                    return !arg.doc_style.has_value();
-                } else {
-                    return false;
-                }
-            }, token.kind);
-        };
+    // Find first non-whitespace/non-trivial-comment token
+    while (auto token = iter.next()) {
+        const auto& kind = token->kind;
+        
+        bool is_ignorable = false;
+        if (std::holds_alternative<Whitespace>(kind)) {
+            is_ignorable = true;
+        }
+        else if (const auto* lc = std::get_if<LineComment>(&kind)) {
+            is_ignorable = (lc->doc_style == std::nullopt);
+        }
+        else if (const auto* bc = std::get_if<BlockComment>(&kind)) {
+            is_ignorable = (bc->doc_style == std::nullopt);
+        }
 
-        auto it = std::find_if(tokens.begin(), tokens.end(), [&](const Token &tok) {
-            return !is_skippable(tok);
-        });
-
-        bool nextIsOpenBracket = (it != tokens.end() && std::holds_alternative<OpenBracket>(it->kind));
-        if (!nextIsOpenBracket) {
-            size_t firstLineEnd = input_tail.find('\n');
-            if (firstLineEnd == std::string::npos) {
-                firstLineEnd = input_tail.size();
-            }
-            return 2 + firstLineEnd;
+        if (!is_ignorable) {
+            first_significant = token;
+            break;
         }
     }
+
+    // Check if first significant token is OpenBracket
+    if (first_significant && 
+        !std::holds_alternative<OpenBracket>(first_significant->kind)) {
+        // Calculate shebang length including newline
+        const size_t newline_pos = input_tail.find('\n');
+        const size_t line_length = (newline_pos != std::string::npos)
+                                  ? newline_pos
+                                  : input_tail.length();
+        return 2 + line_length; // Include the original "#!" prefix
+    }
+
     return std::nullopt;
+
 }
 
 /*
@@ -427,14 +438,110 @@ inline Result<void, RawStrError> validate_raw_string(std::string &input, uint32_
     // Call raw_double_quoted_string and map its result to void.
     Result<uint8_t, RawStrError> res = raw_double_quoted_string(cursor, prefix_len);
     if (res.is_err()) {
-        return Result<void, RawStrError>::Err(res); // Propagate the error.
-    } else {
-        return Result<void, RawStrError>::Ok(std::nullopt);
+        RawStrError res1 = res.unwrap_err();
+        return Result<void, RawStrError>::Err(res1); // Propagate the error.
+    } 
+    
+    return Result<void, RawStrError>::Ok(std::nullopt);
+    
+}
+
+// Creates an iterator that produces tokens from the input string.
+class TokenIterator: Iterator<TokenIterator, Token>{
+    Cursor cursor;
+
+public:
+    explicit TokenIterator(std::string &input) 
+        : cursor(input) {}
+
+    std::optional<Token> next() {
+        Token token = advance_token(&cursor);
+        
+        if (std::holds_alternative<Eof>(token.kind)) {
+            return std::nullopt;
+        } 
+        return token;
+    }
+}; 
+
+TokenIterator tokenize(std::string &input) {
+    return TokenIterator(input);
+}
+
+/*
+True if `c` is considered a whitespace according to Rust language definition.
+See [Rust language reference](https://doc.rust-lang.org/reference/whitespace.html)
+for definitions of these classes.
+*/
+bool is_whictespace(char c) {
+    // This is Pattern_White_Space.
+    //
+    // Note that this set is stable (ie, it doesn't change with different
+    // Unicode versions), so it's ok to just hard-code the values.
+
+    switch (c) {
+        case U'\u0009':  // \t (Horizontal tab)
+        case U'\u000A':  // \n (Line feed)
+        case U'\u000B':  // \v (Vertical tab)
+        case U'\u000C':  // \f (Form feed)
+        case U'\u000D':  // \r (Carriage return)
+        case U'\u0020':  // Space
+        case U'\u0085':  // Next line (NEL)
+        case U'\u200E':  // Left-to-Right Mark
+        case U'\u200F':  // Right-to-Left Mark
+        case U'\u2028':  // Line Separator
+        case U'\u2029':  // Paragraph Separator
+            return true;
+        default:
+            return false;
     }
 }
 
+// True if `c` is valid as a first character of an identifier.
+bool is_id_start(char32_t c) {
+    // Check for underscore or Unicode XID_Start property
+    return c == U'_' || u_isIDStart(static_cast<UChar32>(c));
+}
 
-std::vector<Token> tokenize(std::string &input);
+// True if `c` is valid as a non-first character of an identifier.
+bool is_id_continue(char32_t c) {
+    // Check for Unicode XID_Continue property
+    return u_isIDPart(static_cast<UChar32>(c));
+}
+
+struct CharIterator: Iterator<CharIterator, char> {
+    std::string &input;
+    size_t len;
+    size_t current;
+
+public:
+    explicit CharIterator(std::string &input) 
+        : input(input) {
+            len = input.length();
+            current=0;
+        }
+    
+    std::optional<char> next() {
+        if (current < len) {
+            return input[current++];
+        } else {
+            return std::nullopt;
+        }
+    }
+};
+
+bool is_ident(std::string &str) {
+    CharIterator chars = CharIterator(str);
+
+    if (auto start = chars.next()) {
+        if (start.has_value()) {
+            return is_id_start(start.value()) && chars.all(is_id_continue);
+        } else {
+            return false;
+        }
+    }
+
+}
 
 // From here on out, we just extend the functionality of Cursor class
 // Eats the double-quoted string and returns `n_hashes` and an error if encountered.
@@ -442,15 +549,16 @@ Result<uint8_t, RawStrError> raw_double_quoted_string(Cursor &cursor, uint32_t p
     // Wrap the actual function to handle the error with too many hashes.
     // This way, it eats the whole raw string.
 
-    uint32_t n_hashes = raw_string_unvalidated(cursor, prefix_len);
-
+    Result<uint32_t, RawStrError> n_hashes = raw_string_unvalidated(cursor, prefix_len);
+    uint32_t n_hashes1 = n_hashes.unwrap();
     //only upto 255 `#`s are allowed in a string
-    if(n_hashes > 255) {
-        Result<uint8_t, RawStrError>::Ok(uint8_t(n_hashes));
+    if(n_hashes1 > 255) {
+        Result<uint8_t, RawStrError>::Ok(uint8_t(n_hashes1));
     } else {
-        Result<uint8_t, RawStrError>::Err(TooManyDelimiters{found: n_hashes});
+        Result<uint8_t, RawStrError>::Err(TooManyDelimiters{found: n_hashes1});
     }
 }
 
 Result<uint32_t, RawStrError> raw_string_unvalidated(Cursor &cursor, uint32_t prefix_len);
 
+Token advance_token(Cursor &cursor);
