@@ -455,7 +455,7 @@ public:
         : cursor(input) {}
 
     std::optional<Token> next() {
-        Token token = advance_token(&cursor);
+        Token token = advance_token(cursor);
         
         if (std::holds_alternative<Eof>(token.kind)) {
             return std::nullopt;
