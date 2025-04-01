@@ -237,5 +237,12 @@ enum class TokenType {
     Integer,
     Equals,
     RightBrace,
-    // ... other token types
+    Plus,
+    Minus,
+    Star,
+    Slash,
+    LeftParen,
+    RightParen,
+    Semicolon,
+    EOF_TOKEN
 };
