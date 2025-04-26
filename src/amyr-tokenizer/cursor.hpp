@@ -10,10 +10,11 @@ and position can be shifted forward by the bump method
 #include<string_view>
 #include<optional>
 
+static constexpr char EOF_CHAR = '\0';
 class Cursor {
 
 public:
-    static constexpr char EOF_CHAR = '\0';
+
 
     Cursor(const std::string& input)
             : input_(input), pos_(0), len_remaining_(input.length())
@@ -46,15 +47,15 @@ public:
     If the requested position doesn't exist, EOF_CHAR is returned.
     However, getting `EOF_CHAR` doesn't always mean actual end of file, it should be checked with `is_eof` method.
     */
-    char first_peek() const {
+    char first() const {
         return pos_ < input_.length() ? input_[pos_] : EOF_CHAR;
     }
 
-    char second_peek() const {
+    char second() const {
         return pos_ + 1 < input_.length() ? input_[pos_ + 1] : EOF_CHAR;
     }
 
-    char third_peek() const {
+    char third() const {
         return pos_ + 2 < input_.length() ? input_[pos_ + 2] : EOF_CHAR;
     }
 
@@ -107,9 +108,22 @@ public:
     */
     template <typename Predicate>
     void eat_while(Predicate predicate) {
-        while (!is_eof() && predicate(first_peek())) {
+        while (!is_eof() && predicate(first())) {
             bump();
         }
+    }
+
+    void eat_until(char target) {
+        const size_t found_pos = input_.find(target, pos_);
+        if (found_pos != std::string::npos) {
+            pos_ = found_pos;
+        } else {
+            pos_ = input_.length();
+        }
+    }
+
+    inline size_t pos() const {
+        return pos_;
     }
 
 

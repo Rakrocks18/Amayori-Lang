@@ -58,6 +58,14 @@ public:
         return std::get<T>(value_);
     }
 
+    inline std::optional<T> ok() const {
+        if(is_ok()) {
+            return std::get<T>(value_);
+        } else {
+            return std::nullopt;
+        }
+    }
+
     //Access the error with safety checks
     inline E unwrap_err() const {
         if(!is_err()) {

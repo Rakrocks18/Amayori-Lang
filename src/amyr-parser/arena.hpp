@@ -96,7 +96,7 @@ public:
 
     ~DroplessArena() {
         for (auto& chunk : chunks_) {
-            std::free(chunk.data);
+            std::free(chunk.start);
         }
     }
 

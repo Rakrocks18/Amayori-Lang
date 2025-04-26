@@ -3,7 +3,7 @@
 #include "./AmayoriAST.hpp"
 #include "./amyr-tokenizer/tokenizer.hpp"
 #include "./amyr-borrow-check/BorrowChecker.hpp"
-#include "./utils/ArenaAllocator.hpp"
+#include "./amyr-parser/arena.hpp"
 #include "./amyr-utils/result.hpp"
 
 #include <string_view>
@@ -74,7 +74,7 @@ private:
     std::unordered_set<std::string_view> declared_variables;
     int scope_depth = 0;
 
-    ArenaAllocator<ExprAST> arena; // Arena allocator for AST nodes
+    TypedArena<ExprAST> arena; // Arena allocator for AST nodes
 
     Token peek() const {
         return tokens[current];
