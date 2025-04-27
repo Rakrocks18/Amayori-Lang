@@ -58,6 +58,16 @@ public:
         other.len = 0;
     }
 
+    // Capacity
+    inline size_t length() const noexcept(true) 
+    { return len; }
+    
+    inline size_t capacity() const noexcept 
+        { return cap; }
+    
+    inline bool is_empty() const noexcept 
+        { return len == 0; }
+
     Vec& operator=(Vec&& other) noexcept {
         if (this != &other) {
             clear();
@@ -152,6 +162,22 @@ public:
         len = 0;
     }
 
+    void resize(size_t new_len) {
+        if (new_len > cap) {
+            reserve(new_len);
+        } else if (new_len < len) {
+            truncate(new_len);
+        }
+    }
+
+    void truncate(size_t new_len) {
+        if (new_len >= len) return;
+        for (size_t i = new_len; i < len; ++i) {
+            AllocTraits::destroy(alloc, ptr + i);
+        }
+        len = new_len;
+    }   
+
     template<typename T, typename Allocator>
     class VecIter : public Iterator<VecIter<T, Allocator>, T> {
         size_t index = 0;
@@ -189,14 +215,11 @@ public:
         return value;
     }
 
-    // Capacity
-    inline size_t size() const noexcept { return len; }
-    inline size_t capacity() const noexcept { return cap; }
-    inline bool is_empty() const noexcept { return len == 0; }
+
 
     // Memory management
-    T* data() noexcept { return ptr; }
-    const T* data() const noexcept { return ptr; }
+    T* as_mut_ptr() noexcept { return ptr; }
+    const T* as_mut_ptr() const noexcept { return ptr; }
 
     // Allocator access
     Allocator get_allocator() const noexcept { return alloc; }
@@ -212,7 +235,7 @@ public:
         }
     }
 
-    Vec split_off(size_t at) {
+    Vec<T> split_off(size_t at) {
         if (at > len) throw std::out_of_range("split_off index out of range");
         
         Vec new_vec(alloc);

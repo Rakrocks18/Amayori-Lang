@@ -1,5 +1,33 @@
 #pragma once
 
+/*
+Since this is based of Rust, a lot of items are borrowed from the Rust AST.
+However, with time this will be changed to accomodate various languages. 
+This includes support for object-oriented paradigms, which Rust doesn't support.
+The first iteration of this will look like a copy of the Rust AST, but we need 
+a stable and well functioning AST to build upon. Rust is a good candidate for that.
+*/
+
+// The Rust abstract syntax tree module.
+//
+// This module contains common structures forming the language AST.
+// Two main entities in the module are [`Item`] (which represents an AST element with
+// additional metadata), and [`ItemKind`] (which represents a concrete type and contains
+// information specific to the type of the item).
+//
+// Other module items worth mentioning:
+// - [`Ty`] and [`TyKind`]: A parsed Rust type.
+// - [`Expr`] and [`ExprKind`]: A parsed Rust expression.
+// - [`Pat`] and [`PatKind`]: A parsed Rust pattern. Patterns are often dual to expressions.
+// - [`Stmt`] and [`StmtKind`]: An executable action that does not return a value.
+// - [`FnDecl`], [`FnHeader`] and [`Param`]: Metadata associated with a function declaration.
+// - [`Generics`], [`GenericParam`], [`WhereClause`]: Metadata associated with generic parameters.
+// - [`EnumDef`] and [`Variant`]: Enum declaration.
+// - [`MetaItemLit`] and [`LitKind`]: Literal expressions.
+// - [`MacroDef`], [`MacStmtStyle`], [`MacCall`]: Macro definition and invocation.
+// - [`Attribute`]: Metadata associated with item.
+// - [`UnOp`], [`BinOp`], and [`BinOpKind`]: Unary and binary operators.
+
 #include <string>
 #include <vector>
 #include <memory>
